@@ -1,0 +1,250 @@
+﻿@{
+    ViewData["Title"] = "Student List";
+}
+
+<!-- ✅ Bootstrap CSS -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
+
+<div class="container mt-4">
+    <!-- ✅ Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>🎓 Student List</h2>
+
+        <div class="d-flex align-items-center gap-3">
+            @* <!-- Profile Button -->
+            <button id="profileBtn" class="btn btn-outline-primary d-flex align-items-center">
+                <i class="bi bi-person-circle fs-5 me-2"></i>
+                <span id="usernameDisplay">User</span>
+            </button> *@
+
+            <!-- Logout Button -->
+            <button id="logoutBtn" class="btn btn-outline-danger">
+                <i class="bi bi-box-arrow-right"></i> Logout
+            </button>
+        </div>
+    </div>
+
+    <!-- ✅ Action Buttons -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="d-flex align-items-center gap-2">
+            <label for="filterName" class="fw-semibold">Filter by Name:</label>
+            <input type="text" id="filterName" class="form-control" style="width: 250px;" placeholder="Enter name to filter..." />
+        </div>
+        <div>
+            <button id="coursesPageBtn" class="btn btn-secondary me-2">
+                <i class="bi bi-book"></i> Go to Courses
+            </button>
+            <button id="addStudentBtn" class="btn btn-success">
+                <i class="bi bi-person-plus"></i> Add Student
+            </button>
+        </div>
+    </div>
+
+    <!-- ✅ Student Table -->
+    <table class="table table-bordered table-striped">
+        <thead class="table-dark">
+            <tr>
+                <th>ID</th>
+                <th>Roll No</th>
+                <th>Full Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Date of Birth</th>
+                <th>Gender</th>
+                <th>Course ID</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="studentTableBody"></tbody>
+    </table>
+
+    <!-- ✅ Pagination -->
+    <nav>
+        <ul class="pagination justify-content-center" id="pagination"></ul>
+    </nav>
+
+    <p id="msg" class="text-danger text-center"></p>
+</div>
+
+<!-- ✅ Profile Modal -->
+@* <div class="modal fade" id="profileModal" tabindex="-1" aria-labelledby="profileModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow-lg">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="profileModalLabel">
+                    <i class="bi bi-person-circle me-2"></i>User Profile
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <div class="text-center mb-3">
+                    <i class="bi bi-person-circle text-primary" style="font-size: 4rem;"></i>
+                </div>
+                <p><strong>Username:</strong> <span id="modalUsername"></span></p>
+                <p><strong>Role:</strong> <span id="modalUserRole"></span></p>
+                <hr>
+                <div class="d-grid">
+                    <button id="resetPasswordBtn" class="btn btn-outline-primary">
+                        <i class="bi bi-key me-2"></i> Reset Password
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div> *@
+
+<!-- ✅ jQuery, Bootstrap JS -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    $(document).ready(function () {
+        const token = localStorage.getItem("jwtToken");
+        const username = localStorage.getItem("username");
+        const role = localStorage.getItem("role");
+
+        if (!token) {
+            $("#msg").text("Please log in first!");
+            setTimeout(() => window.location.href = "/Auth/Login", 1500);
+            return;
+        }
+        $("#usernameDisplay").text(username || "User");
+
+        let students = [];
+        let currentPage = 1;
+        const pageSize = 5;
+
+        // ✅ Load Students
+        function loadStudents() {
+            $.ajax({
+                url: "https://localhost:7009/api/Students/AllStudents",
+                type: "GET",
+                headers: { "Authorization": "Bearer " + token },
+                success: function (data) {
+                    students = data;
+                    renderTable();
+                    renderPagination();
+                },
+                error: function (xhr) {
+                    if (xhr.status === 401)
+                        $("#msg").text("Unauthorized: Please login again.");
+                    else
+                        $("#msg").text("Error fetching data from server.");
+                }
+            });
+        }
+
+        // ✅ Render Table
+        function renderTable() {
+            const filter = $("#filterName").val().toLowerCase();
+            const filtered = students.filter(s => s.name && s.name.toLowerCase().includes(filter));
+
+            const start = (currentPage - 1) * pageSize;
+            const paginated = filtered.slice(start, start + pageSize);
+
+            let rows = "";
+            $.each(paginated, function (i, s) {
+                rows += `
+                    <tr>
+                        <td>${s.studentId}</td>
+                        <td>${s.rollNumber}</td>
+                        <td>${s.name}</td>
+                        <td>${s.email}</td>
+                        <td>${s.phone}</td>
+                        <td>${new Date(s.dateOfBirth).toLocaleDateString()}</td>
+                        <td>${s.gender}</td>
+                        <td>${s.courseId}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary editBtn" data-id="${s.studentId}">
+                                <i class="bi bi-pencil-square"></i> Edit
+                            </button>
+                            <button class="btn btn-sm btn-danger deleteBtn" data-id="${s.studentId}">
+                                <i class="bi bi-trash"></i> Delete
+                            </button>
+                        </td>
+                    </tr>`;
+            });
+            $("#studentTableBody").html(rows);
+        }
+
+        // ✅ Render Pagination
+        function renderPagination() {
+            const filter = $("#filterName").val().toLowerCase();
+            const totalItems = students.filter(s => s.name && s.name.toLowerCase().includes(filter)).length;
+            const totalPages = Math.ceil(totalItems / pageSize);
+            let paginationHtml = "";
+
+            for (let i = 1; i <= totalPages; i++) {
+                paginationHtml += `
+                    <li class="page-item ${i === currentPage ? "active" : ""}">
+                        <a class="page-link" href="#">${i}</a>
+                    </li>`;
+            }
+
+            $("#pagination").html(paginationHtml);
+        }
+
+        // ✅ Events
+        $("#pagination").on("click", ".page-link", function (e) {
+            e.preventDefault();
+            currentPage = parseInt($(this).text());
+            renderTable();
+            renderPagination();
+        });
+
+        $("#filterName").on("input", function () {
+            currentPage = 1;
+            renderTable();
+            renderPagination();
+        });
+
+        $(document).on("click", ".editBtn", function () {
+            const id = $(this).data("id");
+            window.location.href = "/Students/Edit/" + id;
+        });
+
+        $(document).on("click", ".deleteBtn", function () {
+            const id = $(this).data("id");
+            if (confirm("Are you sure you want to delete this student?")) {
+                $.ajax({
+                    url: "https://localhost:7009/api/Students/DeleteStudent/" + id,
+                    type: "DELETE",
+                    headers: { "Authorization": "Bearer " + token },
+                    success: function () {
+                        alert("Student deleted successfully!");
+                        loadStudents();
+                    },
+                    error: function (xhr) {
+                        alert("Error deleting student: " + xhr.responseText);
+                    }
+                });
+            }
+        });
+
+        // ✅ Navigation Buttons
+        $("#coursesPageBtn").click(() => window.location.href = "/Courses/Index");
+        $("#addStudentBtn").click(() => window.location.href = "/Students/Add");
+
+        //✅ Profile Modal
+        // $("#profileBtn").click(function () {
+        //     $("#modalUsername").text(username || "Unknown");
+        //     $("#modalUserRole").text(role || "N/A");
+        //     $("#profileModal").modal("show");
+        // });
+
+        // $("#resetPasswordBtn").click(function () {
+        //     $("#profileModal").modal("hide");
+        //     window.location.href = "/Auth/ResetPassword";
+        // });
+
+        // ✅ Logout
+        $("#logoutBtn").click(function () {
+            localStorage.clear();
+            window.location.href = "/Auth/Index";
+        });
+
+        loadStudents();
+    });
+</script>

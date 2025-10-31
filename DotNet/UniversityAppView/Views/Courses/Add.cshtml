@@ -1,0 +1,71 @@
+﻿@{
+    ViewData["Title"] = "Add Course";
+}
+
+<div class="container mt-4">
+    <h2>Add New Course</h2>
+
+    <form id="addCourseForm">
+        <div class="form-group mb-3">
+            <label>Course Code</label>
+            <input type="text" id="courseCode" class="form-control" required />
+        </div>
+        <div class="form-group mb-3">
+            <label>Course Name</label>
+            <input type="text" id="courseName" class="form-control" required />
+        </div>
+        <div class="form-group mb-3">
+            <label>Department</label>
+            <input type="text" id="department" class="form-control" required />
+        </div>
+        <div class="form-group mb-3">
+            <label>Semester</label>
+            <input type="number" id="semester" class="form-control" required />
+        </div>
+
+        <button type="submit" class="btn btn-success">Add</button>
+        <a href="/Courses/Index" class="btn btn-secondary">Cancel</a>
+    </form>
+
+    <p id="msg" class="text-danger mt-3"></p>
+</div>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<script>
+    $(document).ready(function () {
+        var token = localStorage.getItem("jwtToken");
+
+        if (!token) {
+            $("#msg").text("Please log in first!");
+            return;
+        }
+
+        $("#addCourseForm").submit(function (e) {
+            e.preventDefault();
+
+            var newCourse = {
+                courseCode: $("#courseCode").val(),
+                courseName: $("#courseName").val(),
+                department: $("#department").val(),
+                semester: parseInt($("#semester").val())
+            };
+
+            $.ajax({
+                url: "https://localhost:7009/api/Courses/AddCourse",
+                type: "POST",
+                contentType: "application/json",
+                headers: { "Authorization": "Bearer " + token },
+                data: JSON.stringify(newCourse),
+                success: function () {
+                    alert("Course added successfully!");
+                    window.location.href = "/Courses/Index";
+                },
+                error: function (xhr) {
+                    $("#msg").text("Error adding course: " + xhr.responseText);
+                }
+            });
+        });
+    });
+</script>

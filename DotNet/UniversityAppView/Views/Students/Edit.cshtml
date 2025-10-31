@@ -1,0 +1,129 @@
+﻿@{
+    ViewData["Title"] = "Edit Student";
+    var studentId = ViewContext.RouteData.Values["id"];
+}
+
+<div class="container mt-4">
+    <h2 class="mb-4">Edit Student</h2>
+
+    <form id="editStudentForm" class="card p-4 shadow-sm">
+        <input type="hidden" id="studentId" value="@studentId" />
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label>Roll Number</label>
+                <input type="text" id="rollNumber" class="form-control" />
+            </div>
+            <div class="col-md-6 mb-3">
+                <label>Name</label>
+                <input type="text" id="name" class="form-control" />
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label>Email</label>
+                <input type="email" id="email" class="form-control" />
+            </div>
+            <div class="col-md-6 mb-3">
+                <label>Phone</label>
+                <input type="text" id="phone" class="form-control" />
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label>Address</label>
+            <textarea id="address" class="form-control"></textarea>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label>Date of Birth</label>
+                <input type="date" id="dob" class="form-control" />
+            </div>
+            <div class="col-md-6 mb-3">
+                <label>Gender</label>
+                <select id="gender" class="form-select">
+                    <option>Male</option>
+                    <option>Female</option>
+                    <option>Other</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label>Course ID</label>
+            <input type="number" id="courseId" class="form-control" />
+        </div>
+
+        <button type="submit" class="btn btn-primary">Update Student</button>
+        <a href="/Students/Index" class="btn btn-secondary">Cancel</a>
+    </form>
+
+    <p id="msg" class="text-danger mt-3"></p>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<script>
+    $(function () {
+        const token = localStorage.getItem("jwtToken");
+        const id = $("#studentId").val();
+
+        if (!token) {
+            $("#msg").text("Please log in first!");
+            return;
+        }
+
+        // Load student details
+        $.ajax({
+            url: "https://localhost:7009/api/Students/GetStudentById/" + id,
+            type: "GET",
+            headers: { "Authorization": "Bearer " + token },
+            success: function (s) {
+                $("#rollNumber").val(s.rollNumber);
+                $("#name").val(s.name);
+                $("#email").val(s.email);
+                $("#phone").val(s.phone);
+                $("#address").val(s.address);
+                $("#dob").val(s.dateOfBirth.split("T")[0]);
+                $("#gender").val(s.gender);
+                $("#courseId").val(s.courseId);
+            },
+            error: function () {
+                $("#msg").text("Error loading student details.");
+            }
+        });
+
+        // Update
+        $("#editStudentForm").submit(function (e) {
+            e.preventDefault();
+            const student = {
+                studentId: parseInt(id),
+                rollNumber: $("#rollNumber").val(),
+                name: $("#name").val(),
+                email: $("#email").val(),
+                phone: $("#phone").val(),
+                address: $("#address").val(),
+                dateOfBirth: $("#dob").val(),
+                gender: $("#gender").val(),
+                courseId: parseInt($("#courseId").val())
+            };
+
+            $.ajax({
+                url: "https://localhost:7009/api/Students/UpdateStudent/" + id,
+                type: "PUT",
+                headers: { "Authorization": "Bearer " + token },
+                contentType: "application/json",
+                data: JSON.stringify(student),
+                success: function () {
+                    alert("Student updated successfully!");
+                    window.location.href = "/Students/Index";
+                },
+                error: function (xhr) {
+                    $("#msg").text("Error updating student: " + xhr.responseText);
+                }
+            });
+        });
+    });
+</script>
