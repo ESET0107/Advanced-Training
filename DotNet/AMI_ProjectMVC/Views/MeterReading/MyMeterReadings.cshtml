@@ -1,0 +1,75 @@
+﻿@{
+    ViewData["Title"] = "My Meter Readings";
+    Layout = "~/Views/Shared/_DashboardLayout.cshtml";
+}
+
+<div class="container mt-5">
+    <h3 class="mb-4"><i class="bi bi-speedometer2"></i> My Meter Readings</h3>
+
+    <div class="table-responsive shadow-sm rounded">
+        <table class="table table-bordered table-hover align-middle text-center mb-0">
+            <thead class="table-dark text-white">
+                <tr>
+                    <th>Reading ID</th>
+                    <th>Meter ID</th>
+                    <th>Reading Value (kWh)</th>
+                    <th>Reading Date</th>
+                    <th>Created At</th>
+                </tr>
+            </thead>
+            <tbody id="meterReadingsTableBody">
+                <tr><td colspan="5" class="text-muted">Loading your meter readings...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    const apiBase = "https://localhost:7267/api";
+    const token = localStorage.getItem("jwtToken");
+    const consumerId = localStorage.getItem("consumerId"); // Stored during login
+
+    $(document).ready(() => {
+        loadMeterReadings();
+    });
+
+    function authHeader() {
+        return { "Authorization": "Bearer " + token };
+    }
+
+    async function loadMeterReadings() {
+        try {
+            const res = await fetch(`${apiBase}/MeterReading/ByCustomer/${consumerId}`, {
+                headers: authHeader()
+            });
+
+            if (!res.ok) throw new Error("Failed to load meter readings");
+
+            const readings = await res.json();
+            if (!readings.length) {
+                $("#meterReadingsTableBody").html(`<tr><td colspan="5" class="text-muted">No readings found.</td></tr>`);
+                return;
+            }
+
+            let rows = "";
+            readings.forEach(r => {
+                const readingDate = new Date(r.readingDate).toLocaleString();
+                const createdAt = new Date(r.createdAt).toLocaleString();
+
+                rows += `<tr>
+                    <td>${r.readingId}</td>
+                    <td>${r.meterId}</td>
+                    <td>${r.readingValue}</td>
+                    <td>${readingDate}</td>
+                    <td>${createdAt}</td>
+                </tr>`;
+            });
+
+            $("#meterReadingsTableBody").html(rows);
+        } catch (error) {
+            alert("Error loading readings: " + error.message);
+            console.error(error);
+        }
+    }
+</script>

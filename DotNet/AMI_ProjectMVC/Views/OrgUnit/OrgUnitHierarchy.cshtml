@@ -1,0 +1,319 @@
+﻿@{
+    ViewData["Title"] = "Org Unit Hierarchy";
+    Layout = "~/Views/Shared/_DashboardLayout.cshtml";
+}
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2><i class="bi bi-diagram-3"></i> Org Unit Hierarchy</h2>
+        <button class="btn btn-primary" id="addOrgBtn">+ Add Org Unit</button>
+    </div>
+
+    <!-- 🔽 Filters -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <label class="form-label fw-semibold">Zone</label>
+            <select id="zoneSelect" class="form-select">
+                <option value="">-- Select Zone --</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label fw-semibold">Substation</label>
+            <select id="substationSelect" class="form-select">
+                <option value="">-- Select Substation --</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label fw-semibold">Feeder</label>
+            <select id="feederSelect" class="form-select">
+                <option value="">-- Select Feeder --</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label fw-semibold">DTR</label>
+            <select id="dtrSelect" class="form-select">
+                <option value="">-- Select DTR --</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- ⚡ Quick View -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <label class="form-label fw-semibold">Quick View DTR</label>
+            <select id="quickViewDtrSelect" class="form-select">
+                <option value="">-- Select DTR for Quick View --</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="mt-3 mb-4">
+        <h5>📍 Selected Hierarchy:</h5>
+        <p id="selectedHierarchy" class="text-muted">None selected</p>
+    </div>
+
+    <!-- 📊 Meters Table -->
+    <div class="table-responsive">
+        <table class="table table-bordered table-striped text-center align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>Meter ID</th>
+                    <th>Serial No</th>
+                    <th>Consumer ID</th>
+                    <th>Status</th>
+                    <th>Zone</th>
+                    <th>Substation</th>
+                    <th>Feeder</th>
+                    <th>DTR</th>
+                </tr>
+            </thead>
+            <tbody id="meterTableBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 🏗️ Add Org Unit Modal -->
+<div class="modal fade" id="addOrgModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Org Unit</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label">Select Type</label>
+                <select id="orgTypeSelect" class="form-select mb-3">
+                    <option value="">-- Select Type --</option>
+                    <option value="zone">Zone</option>
+                    <option value="substation">Substation</option>
+                    <option value="feeder">Feeder</option>
+                    <option value="dtr">DTR</option>
+                </select>
+
+                <div id="orgParentSelectors"></div>
+                <input id="orgNameInput" type="text" class="form-control mt-3" placeholder="Enter name" />
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button class="btn btn-primary" id="saveOrgBtn">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    const apiBase = "https://localhost:7267/api";
+    const token = localStorage.getItem("jwtToken");
+
+    let zones = [], substations = [], feeders = [], dtrs = [], meters = [];
+
+    document.addEventListener("DOMContentLoaded", async () => {
+        await loadAllData();
+
+        document.getElementById("zoneSelect").addEventListener("change", handleZoneChange);
+        document.getElementById("substationSelect").addEventListener("change", handleSubstationChange);
+        document.getElementById("feederSelect").addEventListener("change", handleFeederChange);
+        document.getElementById("dtrSelect").addEventListener("change", updateMeterDisplay);
+        document.getElementById("addOrgBtn").addEventListener("click", () => new bootstrap.Modal(document.getElementById("addOrgModal")).show());
+
+        // ⚡ Quick View
+        document.getElementById("quickViewDtrSelect").addEventListener("change", handleQuickView);
+    });
+
+    async function loadAllData() {
+        [zones, substations, feeders, dtrs, meters] = await Promise.all([
+            fetchData(`${apiBase}/Zone/AllZones`),
+            fetchData(`${apiBase}/Substation/AllSubstations`),
+            fetchData(`${apiBase}/Feeders/AllFeeders`),
+            fetchData(`${apiBase}/Dtr/AllDtrs`),
+            fetchData(`${apiBase}/Meters/AllMeters`)
+        ]);
+
+        populateDropdown("zoneSelect", zones, "zoneId", "zoneName");
+        populateDropdown("quickViewDtrSelect", dtrs, "dtrId", "dtrname");
+    }
+
+    async function fetchData(url) {
+        const res = await fetch(url, {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (!res.ok) return [];
+        return res.json();
+    }
+
+    function populateDropdown(selectId, data, valueKey, textKey, filterFn = null) {
+        const select = document.getElementById(selectId);
+        select.innerHTML = `<option value="">-- Select --</option>`;
+        const filtered = filterFn ? data.filter(filterFn) : data;
+        filtered.forEach(item => {
+            select.innerHTML += `<option value="${item[valueKey]}">${item[textKey]}</option>`;
+        });
+    }
+
+    // 🔄 Hierarchy logic
+    function handleZoneChange() {
+        const zoneId = parseInt(document.getElementById("zoneSelect").value);
+        populateDropdown("substationSelect", substations, "substationId", "substationName", s => s.zoneId === zoneId);
+        clearDropdowns(["feederSelect", "dtrSelect"]);
+        updateMeterDisplay();
+    }
+
+    function handleSubstationChange() {
+        const substationId = parseInt(document.getElementById("substationSelect").value);
+        populateDropdown("feederSelect", feeders, "feederId", "feederName", f => f.substationId === substationId);
+        clearDropdowns(["dtrSelect"]);
+        updateMeterDisplay();
+    }
+
+    function handleFeederChange() {
+        const feederId = parseInt(document.getElementById("feederSelect").value);
+        populateDropdown("dtrSelect", dtrs, "dtrId", "dtrname", d => d.feederId === feederId);
+        updateMeterDisplay();
+    }
+
+    // ⚡ Quick View DTR
+    function handleQuickView(e) {
+        const dtrId = parseInt(e.target.value);
+        if (!dtrId) return;
+
+        const selectedDtr = dtrs.find(d => d.dtrId === dtrId);
+        const selectedFeeder = feeders.find(f => f.feederId === selectedDtr.feederId);
+        const selectedSub = substations.find(s => s.substationId === selectedFeeder.substationId);
+        const selectedZone = zones.find(z => z.zoneId === selectedSub.zoneId);
+
+        // Auto-fill dropdowns
+        document.getElementById("zoneSelect").value = selectedZone.zoneId;
+        handleZoneChange();
+
+        setTimeout(() => {
+            document.getElementById("substationSelect").value = selectedSub.substationId;
+            handleSubstationChange();
+
+            setTimeout(() => {
+                document.getElementById("feederSelect").value = selectedFeeder.feederId;
+                handleFeederChange();
+
+                setTimeout(() => {
+                    document.getElementById("dtrSelect").value = selectedDtr.dtrId;
+                    updateMeterDisplay();
+                }, 300);
+            }, 300);
+        }, 300);
+    }
+
+    function updateMeterDisplay() {
+        const zoneId = parseInt(document.getElementById("zoneSelect").value);
+        const substationId = parseInt(document.getElementById("substationSelect").value);
+        const feederId = parseInt(document.getElementById("feederSelect").value);
+        const dtrId = parseInt(document.getElementById("dtrSelect").value);
+
+        let filteredMeters = [...meters];
+
+        if (dtrId) filteredMeters = filteredMeters.filter(m => m.dtrid === dtrId);
+        else if (feederId) {
+            const dtrIds = dtrs.filter(d => d.feederId === feederId).map(d => d.dtrId);
+            filteredMeters = filteredMeters.filter(m => dtrIds.includes(m.dtrid));
+        }
+        else if (substationId) {
+            const feederIds = feeders.filter(f => f.substationId === substationId).map(f => f.feederId);
+            const dtrIds = dtrs.filter(d => feederIds.includes(d.feederId)).map(d => d.dtrId);
+            filteredMeters = filteredMeters.filter(m => dtrIds.includes(m.dtrid));
+        }
+        else if (zoneId) {
+            const subIds = substations.filter(s => s.zoneId === zoneId).map(s => s.substationId);
+            const feederIds = feeders.filter(f => subIds.includes(f.substationId)).map(f => f.feederId);
+            const dtrIds = dtrs.filter(d => feederIds.includes(d.feederId)).map(d => d.dtrId);
+            filteredMeters = filteredMeters.filter(m => dtrIds.includes(m.dtrid));
+        }
+
+        renderMeters(filteredMeters);
+        displaySelectedHierarchy();
+    }
+
+    function renderMeters(data) {
+        const tbody = document.getElementById("meterTableBody");
+        tbody.innerHTML = data.length ? "" : "<tr><td colspan='8'>No meters found</td></tr>";
+
+        data.forEach(m => {
+            const dtr = dtrs.find(d => d.dtrId === m.dtrid);
+            const feeder = feeders.find(f => dtr && f.feederId === dtr.feederId);
+            const sub = substations.find(s => feeder && s.substationId === feeder.substationId);
+            const zone = zones.find(z => sub && z.zoneId === sub.zoneId);
+
+            tbody.innerHTML += `
+                <tr>
+                    <td>${m.meterId}</td>
+                    <td>${m.meterSerialNo || "-"}</td>
+                    <td>${m.consumerId || "-"}</td>
+                    <td>${m.status || "-"}</td>
+                    <td>${zone ? zone.zoneName : "-"}</td>
+                    <td>${sub ? sub.substationName : "-"}</td>
+                    <td>${feeder ? feeder.feederName : "-"}</td>
+                    <td>${dtr ? dtr.dtrname : "-"}</td>
+                </tr>`;
+        });
+    }
+
+    function clearDropdowns(ids) {
+        ids.forEach(id => {
+            document.getElementById(id).innerHTML = `<option value="">-- Select --</option>`;
+        });
+    }
+
+    function displaySelectedHierarchy() {
+        const zone = document.getElementById("zoneSelect").selectedOptions[0]?.text;
+        const sub = document.getElementById("substationSelect").selectedOptions[0]?.text;
+        const feeder = document.getElementById("feederSelect").selectedOptions[0]?.text;
+        const dtr = document.getElementById("dtrSelect").selectedOptions[0]?.text;
+
+        const selected = [zone, sub, feeder, dtr].filter(v => v && !v.includes("-- Select")).join(" → ");
+        document.getElementById("selectedHierarchy").innerText = selected || "None selected";
+    }
+
+    // 🏗️ Dynamic Parent Selection for Add Modal
+    document.getElementById("orgTypeSelect").addEventListener("change", e => {
+        const type = e.target.value;
+        const container = document.getElementById("orgParentSelectors");
+        container.innerHTML = '';
+
+        if (type === 'substation') {
+            container.innerHTML = `
+              <label class="form-label">Select Zone</label>
+              <select id="parentZone" class="form-select mb-2"></select>`;
+            populateDropdown("parentZone", zones, "zoneId", "zoneName");
+        }
+        else if (type === 'feeder') {
+            container.innerHTML = `
+              <label class="form-label">Select Zone</label>
+              <select id="parentZone" class="form-select mb-2"></select>
+              <label class="form-label">Select Substation</label>
+              <select id="parentSubstation" class="form-select"></select>`;
+            populateDropdown("parentZone", zones, "zoneId", "zoneName");
+            document.getElementById('parentZone').addEventListener('change', e => {
+                const zoneId = parseInt(e.target.value);
+                populateDropdown("parentSubstation", substations, "substationId", "substationName", s => s.zoneId === zoneId);
+            });
+        }
+        else if (type === 'dtr') {
+            container.innerHTML = `
+              <label class="form-label">Select Zone</label>
+              <select id="parentZone" class="form-select mb-2"></select>
+              <label class="form-label">Select Substation</label>
+              <select id="parentSubstation" class="form-select mb-2"></select>
+              <label class="form-label">Select Feeder</label>
+              <select id="parentFeeder" class="form-select"></select>`;
+            populateDropdown("parentZone", zones, "zoneId", "zoneName");
+            document.getElementById('parentZone').addEventListener('change', e => {
+                const zoneId = parseInt(e.target.value);
+                populateDropdown("parentSubstation", substations, "substationId", "substationName", s => s.zoneId === zoneId);
+            });
+            document.getElementById('parentSubstation').addEventListener('change', e => {
+                const subId = parseInt(e.target.value);
+                populateDropdown("parentFeeder", feeders, "feederId", "feederName", f => f.substationId === subId);
+            });
+        }
+    });
+</script>
