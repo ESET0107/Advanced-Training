@@ -1,0 +1,10 @@
+{
+  "login": "Login",
+  "signup": "Signup",
+  "reset": "Reset Password",
+  "forgot": "Forgot Password",
+  "toggle_theme": "Toggle Theme",
+  "change_language": "Change Language",
+  "home": "Home",
+  "dashboard": "Dashboard"
+}

@@ -1,0 +1,10 @@
+{
+  "login": "Iniciar sesión",
+  "signup": "Registrarse",
+  "reset": "Restablecer contraseña",
+  "forgot": "Olvidé mi contraseña",
+  "toggle_theme": "Cambiar tema",
+  "change_language": "Cambiar idioma",
+  "home": "Inicio",
+  "dashboard": "Tablero"
+}
